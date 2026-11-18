@@ -1,6 +1,6 @@
 import * as T from "three";
 import { readModel } from "./classic.js";
-const base = "/classic/";
+const base = "./classic/";
 const json = (name) => fetch(base + name + ".json").then((r) => r.json());
 export async function buildWorld(scene) {
   const [{ meta, pads }, bytes, atlas, props, switches, cocoData] =
@@ -118,6 +118,15 @@ export async function buildWorld(scene) {
       p.angle,
     );
     p.mesh = model.mesh;
+    for (const material of p.mesh.material) {
+      material.uniforms.selected = { value: 0 };
+      material.fragmentShader =
+        "uniform float selected; " +
+        material.fragmentShader.replace(
+          "gl_FragColor=",
+          "c.rgb += vec3(0.,.86,.6)*selected*max(0.,c.b-c.r);gl_FragColor=",
+        );
+    }
   }
   const barrier = await readModel(props.Bar2V);
   const barriers = [];
@@ -166,7 +175,7 @@ export async function buildWorld(scene) {
       new T.PointsMaterial({ color: 0xe1ccff, size: 0.075, toneMapped: false }),
     ),
   );
-  const film = await new T.TextureLoader().loadAsync("/classic/vortex.png");
+  const film = await new T.TextureLoader().loadAsync("./classic/vortex.png");
   film.flipY = false;
   film.magFilter = T.NearestFilter;
   film.minFilter = T.LinearFilter;
@@ -187,7 +196,15 @@ export async function buildWorld(scene) {
   scene.add(vortex);
   vortex.visible = false;
   let active = -1;
+  let openedAt = 0,
+    clock = 0;
   function activate(i) {
+    if (active >= 0)
+      for (const m of portals[active].mesh.material)
+        m.uniforms.selected.value = 0;
+    if (i >= 0)
+      for (const m of portals[i].mesh.material) m.uniforms.selected.value = 1;
+    openedAt = clock;
     active = i;
     vortex.visible = i >= 0;
     if (i < 0) return;
@@ -251,6 +268,11 @@ export async function buildWorld(scene) {
     activate,
     vortex,
     update(t, camera) {
+      clock = t;
+      if (active >= 0)
+        vortex.scale.setScalar(
+          Math.max(0.005, T.MathUtils.smoothstep(t - openedAt, 0, 0.5)),
+        );
       for (const m of barriers)
         m.visible = camera.position.distanceTo(m.position) > 7.2;
       vortex.material.uniforms.frame.value = Math.floor(t * 7) % 6;

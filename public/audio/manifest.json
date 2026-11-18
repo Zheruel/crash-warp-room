@@ -1,0 +1,31 @@
+{
+  "music": {
+    "title": {
+      "files": ["title.ogg", "title.mp3"],
+      "rate": 48000,
+      "samples": 2078748,
+      "loopStart": 346330,
+      "loopEnd": 2078748,
+      "source": "3C.NSF (Title Screen) SEQ+VAB, 133 bpm, loop = CC99 20..30"
+    },
+    "tt": {
+      "files": ["tt.ogg", "tt.mp3"],
+      "rate": 48000,
+      "samples": 3758290,
+      "loopStart": 0,
+      "loopEnd": 3758290,
+      "source": "02.NSF (Time Twister) SEQ+VAB, 141 bpm, whole-song loop"
+    }
+  },
+  "sfx": {
+    "spin": "spn0A",
+    "jump": "jmp0A",
+    "menu": "Mb10A",
+    "confirm": "tal0A",
+    "pad": "WAp2A",
+    "portal": "WSu2A",
+    "respawn": "fal0A",
+    "step": "fs00A",
+    "land": "ld00A"
+  }
+}

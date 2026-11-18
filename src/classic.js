@@ -7,7 +7,7 @@ async function page(path) {
   if (!textures.has(path))
     textures.set(
       path,
-      loader.loadAsync("/classic/" + path).then((texture) => {
+      loader.loadAsync("./classic/" + path).then((texture) => {
         texture.flipY = false;
         texture.magFilter = T.NearestFilter;
         texture.minFilter = T.LinearFilter;
@@ -33,18 +33,34 @@ export async function readModel(data) {
     data.groups.map(async (group, i) => {
       geometry.addGroup(group.start, group.count, i);
       const texture = await page(group.path);
-      return new T.ShaderMaterial({
+      const material = new T.ShaderMaterial({
         side: T.DoubleSide,
-        uniforms: { sheet: { value: texture } },
+        uniforms: {
+          sheet: { value: texture },
+          alpha: { value: group.psxBlend === 0 ? 0.5 : 1 },
+        },
         vertexShader:
           "attribute vec3 color; varying vec3 rgb; varying vec2 tex; void main(){rgb=color;tex=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
         fragmentShader:
-          "varying vec3 rgb; varying vec2 tex; uniform sampler2D sheet; void main(){vec4 c=vec4(rgb,1.);" +
+          "varying vec3 rgb; varying vec2 tex; uniform sampler2D sheet; uniform float alpha; void main(){vec4 c=vec4(rgb,1.);" +
           (texture
             ? "vec4 t=texture2D(sheet,tex);if(t.a<.1)discard;c.rgb*=2.*t.rgb;"
             : "") +
-          "gl_FragColor=c;}",
+          "gl_FragColor=vec4(c.rgb,alpha);}",
       });
+      if (group.psxBlend !== undefined && group.psxBlend !== 3) {
+        material.transparent = true;
+        material.depthWrite = false;
+        material.forceSinglePass = true;
+        if (group.psxBlend === 1) material.blending = T.AdditiveBlending;
+        if (group.psxBlend === 2) {
+          material.blending = T.CustomBlending;
+          material.blendEquation = T.ReverseSubtractEquation;
+          material.blendSrc = T.OneFactor;
+          material.blendDst = T.OneFactor;
+        }
+      }
+      return material;
     }),
   );
   const mesh = new T.Mesh(geometry, materials);
@@ -66,7 +82,7 @@ export async function readModel(data) {
 }
 
 export async function player() {
-  const data = await (await fetch("/classic/WillC.json")).json();
+  const data = await (await fetch("./classic/WillC.json")).json();
   const clips = Object.fromEntries(
     await Promise.all(
       Object.entries(data).map(async ([key, d]) => [key, await readModel(d)]),
@@ -83,7 +99,7 @@ export async function player() {
   let active;
   function animate(t, speed, airborne, spin) {
     const key = spin
-      ? "CfS4V"
+      ? "WiBlV"
       : airborne
         ? "CJF1V"
         : speed > 0.4
@@ -99,19 +115,19 @@ export async function player() {
     }
     clip.pose(
       spin
-        ? spin * (clip.count - 1)
+        ? Math.floor(spin * clip.count)
         : airborne
           ? Math.min(clip.count - 1, 6)
           : t * (speed > 0.07 ? 17 : 10),
     );
-    rig.rotation.y = spin ? spin * Math.PI * 4 : 0;
+    rig.rotation.y = spin ? -Math.PI * 6 * spin : 0;
   }
   animate(0, 0, false, 0);
   return { root, animate };
 }
 
 export async function title() {
-  const data = await (await fetch("/classic/TitOC.json")).json();
+  const data = await (await fetch("./classic/TitOC.json")).json();
   const scene = new T.Scene(),
     camera = new T.PerspectiveCamera(54, 1, 0.1, 2000);
   const group = new T.Group();

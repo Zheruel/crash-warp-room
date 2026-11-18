@@ -1,5 +1,7 @@
 import * as T from "three";
 import { buildWorld } from "./hub.js";
+import { createAudio } from "./audio.js";
+import { hubCamera } from "./camera.js";
 import { player, title } from "./classic.js";
 const $ = (s) => document.querySelector(s),
   canvas = $("#world"),
@@ -47,13 +49,14 @@ render.outputColorSpace = T.SRGBColorSpace;
 render.toneMapping = T.ACESFilmicToneMapping;
 render.toneMappingExposure = 1.13;
 const scene = new T.Scene(),
-  cam = new T.PerspectiveCamera(42, 1, 0.05, 155),
+  cam = new T.PerspectiveCamera(48, 1, 0.05, 155),
   [world, crash, titleScreen] = await Promise.all([
     buildWorld(scene),
     player(),
     title(),
   ]);
 scene.add(crash.root);
+const cameraRig = hubCamera();
 const shadowCanvas = document.createElement("canvas");
 shadowCanvas.width = shadowCanvas.height = 96;
 const sc = shadowCanvas.getContext("2d"),
@@ -75,6 +78,7 @@ shadow.rotation.x = -Math.PI / 2;
 shadow.position.y = 0.069;
 scene.add(shadow);
 let activePad = -1;
+let enteringPortal = 0;
 let mode = "menu",
   selected = 0,
   focusPortal = -1,
@@ -84,9 +88,7 @@ let mode = "menu",
   spin = 0,
   camYaw = 0,
   dialogKind = "",
-  audio = null,
-  ambient = null,
-  soundOn = localStorage.warpSound === "on",
+  soundOn = localStorage.warpSound !== "off",
   heading = 0.15,
   transition = 1,
   gamepadButtons = [],
@@ -138,47 +140,28 @@ const icon = () => {
     "</svg>";
   sound.setAttribute("aria-label", soundOn ? "Mute sound" : "Enable sound");
 };
+const audio = createAudio();
+audio.setMuted(!soundOn);
+audio.setMode("menu");
 function unlock() {
-  if (!soundOn) return;
-  if (!audio) {
-    audio = new AudioContext();
-    ambient = audio.createGain();
-    ambient.gain.value = 0.022;
-    ambient.connect(audio.destination);
-    for (const freq of [110, 164.81, 220.2]) {
-      let o = audio.createOscillator();
-      o.frequency.value = freq;
-      o.connect(ambient);
-      o.start();
-    }
-  }
-  audio.resume().catch(() => {});
+  if (soundOn) audio.unlock();
 }
-function tone(freq, duration = 0.14, type = "sine", end = freq) {
-  if (!soundOn || !audio) return;
-  const o = audio.createOscillator(),
-    v = audio.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, audio.currentTime);
-  o.frequency.exponentialRampToValueAtTime(end, audio.currentTime + duration);
-  v.gain.setValueAtTime(0.075, audio.currentTime);
-  v.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duration);
-  o.connect(v).connect(audio.destination);
-  o.start();
-  o.stop(audio.currentTime + duration);
-}
+addEventListener("pointerdown", unlock, { capture: true });
+document.addEventListener("visibilitychange", () =>
+  audio.setPaused(
+    document.hidden || dialogKind === "pause" || dialogKind === "controls",
+  ),
+);
 sound.onclick = () => {
   soundOn = !soundOn;
   localStorage.warpSound = soundOn ? "on" : "off";
-  if (soundOn) {
-    unlock();
-    tone(440);
-  } else audio?.suspend();
+  audio.setMuted(!soundOn);
+  unlock();
   icon();
 };
 icon();
 function setSelected(i) {
-  if (i !== selected) tone(390, 0.07);
+  if (i !== selected) audio.play("menu");
   selected = i;
   menuButtons.forEach((b, j) => b.classList.toggle("selected", i === j));
 }
@@ -199,6 +182,7 @@ function footer() {
 function switchMode(value) {
   unlock();
   mode = value;
+  audio.setMode(value);
   const on = mode === "play";
   document.body.classList.toggle("playing", on);
   menu.hidden = on;
@@ -206,6 +190,7 @@ function switchMode(value) {
   $("#hud").hidden = !on;
   $("#touch").hidden = !on || !matchMedia("(pointer:coarse)").matches;
   $("#prompt").hidden = true;
+  $("#levelName").hidden = true;
   transition = 0;
   pos.set(0, world.height(0, 0) + 0.035, 0);
   vel.set(0, 0);
@@ -214,15 +199,18 @@ function switchMode(value) {
   heading = on ? -0.65 : 0.15;
   spin = 0;
   camYaw = 0;
+  cameraRig.reset();
   focusPortal = -1;
   activePad = -1;
+  enteringPortal = 0;
   world.activate(-1);
   keys.clear();
   footer();
-  tone(on ? 294 : 440, 0.32, "sine", on ? 587 : 330);
+  audio.play("confirm");
 }
 function close() {
   dialog.close();
+  audio.setPaused(document.hidden);
   dialogKind = "";
   dialogTimer = 0.18;
   keys.clear();
@@ -232,6 +220,7 @@ function modal(kind, title, html, buttons) {
   keys.clear();
   vel.set(0, 0);
   dialogKind = kind;
+  audio.setPaused(document.hidden || kind === "pause" || kind === "controls");
   $("#details").innerHTML = html;
   dialog.querySelector("h1").textContent = title;
   const actions = $("#dialogActions");
@@ -283,7 +272,8 @@ function loadGame() {
   const y = world.height(slot.x, slot.z, slot.y + 0.5);
   if (Number.isFinite(y)) {
     pos.set(slot.x, y + 0.035, slot.z);
-    camYaw = slot.cam;
+    camYaw = slot.cam || 0;
+    cameraRig.reset(camYaw);
     heading = slot.h;
   }
 }
@@ -296,7 +286,6 @@ function controls() {
       ["Jump", "Space · A"],
       ["Spin", "X · X"],
       ["Use portal", "E · Y"],
-      ["Rotate camera", "Q / R · Right stick"],
       ["Pause", "Esc · Start"],
     ]
       .map(([a, b]) => '<div class="row">' + a + "<span>" + b + "</span></div>")
@@ -318,10 +307,10 @@ function paused() {
     ],
   ]);
 }
-function portal() {
+function portal(fromJump = false) {
   if (focusPortal < 0) return;
   let i = focusPortal;
-  tone(440, 0.55, "sine", 880);
+  if (fromJump !== true) audio.play("portal");
   modal(
     "portal",
     names[i],
@@ -362,13 +351,13 @@ function jump() {
   if (ground) {
     vy = 7.1;
     ground = false;
-    tone(250, 0.19, "sine", 490);
+    audio.play("jump");
   }
 }
 function doSpin() {
   if (!spin) {
     spin = 0.001;
-    tone(190, 0.24, "triangle", 52);
+    audio.play("spin");
   }
 }
 function act(code) {
@@ -435,7 +424,8 @@ stick.onlostpointercapture = () => {
   stick.firstChild.style.transform = "";
 };
 const down = (...c) => (c.some((k) => keys.has(k)) ? 1 : 0);
-let lastSave = 0;
+let lastSave = 0,
+  strideDistance = 0;
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
@@ -473,12 +463,11 @@ function frame(now) {
     gamepadButtons = pad.buttons.map((b) => b.pressed);
     gamepadButtons[20] = Math.abs(axis(1)) > 0.6;
   }
-  const step = dialog.open ? 0 : dt;
-  time += step;
+  const step = dialog.open || enteringPortal ? 0 : dt;
+  time += dialog.open ? 0 : dt;
   world.update(time, cam);
   transition = Math.min(1, transition + dt * 1.4);
   if (mode === "play") {
-    camYaw += ((down("KeyR") - down("KeyQ")) * 1.65 + axis(2) * 2) * step;
     let x =
         down("KeyD", "ArrowRight") -
         down("KeyA", "ArrowLeft") +
@@ -493,10 +482,19 @@ function frame(now) {
       tz = (z * Math.cos(camYaw) - x * Math.sin(camYaw)) * 4.8;
     vel.x = T.MathUtils.damp(vel.x, tx, 15, step);
     vel.y = T.MathUtils.damp(vel.y, tz, 15, step);
+    const beforeX = pos.x,
+      beforeZ = pos.z;
     const nx = pos.x + vel.x * step,
       nz = pos.z + vel.y * step;
     if (!world.blocked(pos.x, pos.z, nx, pos.z, pos.y)) pos.x = nx;
     if (!world.blocked(pos.x, pos.z, pos.x, nz, pos.y)) pos.z = nz;
+    if (ground && !spin && vel.length() > 0.3) {
+      strideDistance += Math.hypot(pos.x - beforeX, pos.z - beforeZ);
+      if (strideDistance >= 1.48) {
+        audio.play("step");
+        strideDistance %= 1.48;
+      }
+    } else strideDistance = 0;
     if (vel.length() > 0.12) {
       const h = Math.atan2(vel.x, vel.y);
       heading +=
@@ -510,6 +508,7 @@ function frame(now) {
       vy -= 19 * step;
       pos.y += vy * step;
       if (vy <= 0 && pos.y <= floor + 0.035 && pos.y > floor - 0.65) {
+        if (vy < -2) audio.play("land");
         pos.y = floor + 0.035;
         vy = 0;
         ground = true;
@@ -519,7 +518,7 @@ function frame(now) {
         vel.set(0, 0);
         ground = true;
         vy = 0;
-        tone(220, 0.25);
+        audio.play("respawn");
       }
     }
     if (time - lastSave > 2 && ground) {
@@ -527,7 +526,7 @@ function frame(now) {
       lastSave = time;
     }
     if (spin) {
-      spin += step * 2.6;
+      spin += step * (30 / 12);
       if (spin >= 1) spin = 0;
     }
     const standing = world.portals.findIndex(
@@ -536,7 +535,9 @@ function frame(now) {
     if (standing >= 0 && standing !== activePad && ground) {
       activePad = standing;
       world.activate(activePad);
-      tone(370, 0.3, "sine", 740);
+      $("#levelName").textContent = names[standing];
+      $("#levelName").hidden = false;
+      audio.play("pad");
     }
     if (
       activePad >= 0 &&
@@ -547,6 +548,7 @@ function frame(now) {
     ) {
       activePad = -1;
       world.activate(-1);
+      $("#levelName").hidden = true;
     }
     focusPortal =
       standing >= 0
@@ -565,12 +567,23 @@ function frame(now) {
         (pad ? "Y" : matchMedia("(pointer:coarse)").matches ? "USE" : "[E]") +
         "   " +
         names[focusPortal];
-    camGoal.set(
-      pos.x + Math.sin(camYaw) * 10.5,
-      3.8 + Math.max(0, pos.y) * 0.6,
-      pos.z + Math.cos(camYaw) * 10.5,
-    );
-    lookGoal.set(pos.x, 1.65 + Math.max(0, pos.y) * 0.6, pos.z - 1.45);
+    if (
+      !enteringPortal &&
+      !dialog.open &&
+      !ground &&
+      activePad >= 0 &&
+      Math.hypot(
+        pos.x - world.vortex.position.x,
+        pos.y + 0.85 - world.vortex.position.y,
+        pos.z - world.vortex.position.z,
+      ) < 1.7
+    ) {
+      enteringPortal = 0.001;
+      focusPortal = activePad;
+      vel.set(0, 0);
+      audio.play("portal");
+    }
+    camYaw = cameraRig.update(pos, step, camGoal, lookGoal);
   } else {
     pos.set(0, 0.045, 0);
     heading = -0.37 + 0.04 * Math.sin(time * 0.5);
@@ -590,6 +603,23 @@ function frame(now) {
     !ground,
     spin,
   );
+  crash.root.scale.setScalar(1);
+  if (enteringPortal && !dialog.open) {
+    enteringPortal = Math.min(1, enteringPortal + dt / 0.55);
+    const pull = enteringPortal * enteringPortal;
+    crash.root.position.lerp(world.vortex.position, pull);
+    crash.root.rotation.y += pull * Math.PI * 2;
+    crash.root.scale.setScalar(1 - 0.96 * pull);
+    if (enteringPortal === 1) {
+      const pad = world.portals[activePad];
+      focusPortal = activePad;
+      pos.set(pad.x, world.height(pad.x, pad.z, 1) + 0.035, pad.z);
+      ground = true;
+      vy = 0;
+      enteringPortal = 0;
+      portal(true);
+    }
+  }
   const sy = world.height(pos.x, pos.z, pos.y + 0.13);
   shadow.position.set(pos.x, Number.isFinite(sy) ? sy + 0.025 : 0, pos.z);
   shadow.visible = Number.isFinite(sy) && mode === "play";
