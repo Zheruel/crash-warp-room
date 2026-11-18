@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#131325" />
+    <link rel="icon" href="data:," />
+    <title>Crash Bandicoot 3 · Warped</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas
+      id="world"
+      aria-label="Three-dimensional Time Twister warp room"
+    ></canvas>
+    <div id="shade"></div>
+    <header>
+      <div class="stamp">
+        <span class="clockIcon"></span><span>TIME TWISTER</span>
+      </div>
+      <button
+        id="sound"
+        aria-label="Enable sound"
+        title="Toggle sound"
+      ></button>
+    </header>
+    <main id="menu">
+      <canvas
+        id="logo"
+        aria-label="Crash Bandicoot 3: Warped"
+        role="img"
+      ></canvas>
+      <nav>
+        <button class="menuButton selected" id="play">New Game</button
+        ><button class="menuButton" id="controls">Load Game</button>
+      </nav>
+    </main>
+    <section id="hud" hidden><b>Warp Room</b><span>Time Twister</span></section>
+    <div id="prompt" hidden></div>
+    <div id="touch" hidden>
+      <div id="stick"><i></i></div>
+      <div class="actions">
+        <button id="interactTouch">USE</button
+        ><button id="spinTouch">SPIN</button
+        ><button id="jumpTouch">JUMP</button>
+      </div>
+    </div>
+    <footer>
+      <div class="hints"></div>
+      <span class="location"
+        ><i></i> <span id="screenName">MAIN MENU</span></span
+      >
+    </footer>
+    <dialog>
+      <div class="dialogBody">
+        <small>TIME TWISTER</small>
+        <h1></h1>
+        <div id="details"></div>
+        <div id="dialogActions"></div>
+      </div>
+    </dialog>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

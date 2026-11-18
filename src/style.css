@@ -1,0 +1,456 @@
+@font-face {
+  font-family: Lucky;
+  src: url(/luckiest.ttf);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #100e20;
+  color: #fff4df;
+  font:
+    600 16px system-ui,
+    sans-serif;
+  overflow: hidden;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+}
+button:focus-visible {
+  outline: 3px solid #fff4a0;
+  outline-offset: 5px;
+}
+#world,
+#shade {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#shade {
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #0a091ac9 0%, #100c1a91 26%, transparent 59%),
+    linear-gradient(
+      0deg,
+      #070713ce,
+      transparent 17%,
+      transparent 87%,
+      #100c1a77
+    );
+}
+header,
+footer {
+  position: fixed;
+  left: 3.9%;
+  right: 3.9%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header {
+  top: 4.3%;
+  z-index: 2;
+}
+.stamp,
+.location {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  color: #e8dfce;
+}
+.clockIcon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #eac971;
+  border-radius: 50%;
+  position: relative;
+  transform: rotate(12deg);
+}
+.clockIcon:before {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 8px;
+  left: 9px;
+  top: 3px;
+  border-left: 2px solid #eac971;
+  border-bottom: 2px solid #eac971;
+}
+.clockIcon:after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: -6px;
+  width: 8px;
+  height: 3px;
+  background: #eac971;
+}
+#sound,
+#pause {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #fff4;
+  border-radius: 50%;
+  color: white;
+  background: #100e2380;
+  display: grid;
+  place-items: center;
+}
+#pause {
+  margin-left: auto;
+  margin-right: 8px;
+}
+#menu {
+  position: absolute;
+  left: 3.5%;
+  top: 49%;
+  transform: translateY(-50%);
+  width: min(44vw, 660px);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+#logo {
+  width: 100%;
+  aspect-ratio: 1.72;
+  display: block;
+  filter: drop-shadow(0 10px 8px #0b071c88);
+}
+nav {
+  display: grid;
+  gap: 8px;
+  margin-top: clamp(12px, 3vh, 32px);
+  width: 68%;
+}
+.menuButton,
+#dialogActions button {
+  font:
+    clamp(19px, 1.65vw, 29px) Lucky,
+    sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff0cf;
+  position: relative;
+  padding: 14px 10px 10px;
+  background: linear-gradient(110deg, #2d2036ee, #201b2aee);
+  border: 1px solid #99816b90;
+  transform: skewX(-7deg);
+  box-shadow: 0 4px #0b0917;
+}
+.menuButton.selected,
+#dialogActions button:first-child {
+  background: linear-gradient(174deg, #ffe279, #ffc448 58%, #ef9b2a);
+  color: #33201e;
+  border: 2px solid #ffe794;
+  box-shadow:
+    inset 0 -3px #d28526,
+    0 4px #452629;
+}
+.menuButton.selected:before {
+  content: "";
+  border: 8px solid transparent;
+  border-left: 12px solid #ffdc67;
+  position: absolute;
+  left: -23px;
+  top: calc(50% - 8px);
+}
+footer {
+  bottom: 4%;
+  font-size: 12px;
+  color: #e7dcd7;
+}
+.hints {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hints span {
+  margin-right: 12px;
+}
+kbd {
+  display: inline-flex;
+  min-width: 20px;
+  height: 21px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b7acb18a;
+  border-bottom: 2px solid #bbafb1aa;
+  border-radius: 4px;
+  font: 700 11px system-ui;
+  padding: 0 5px;
+  background: #1b172d88;
+  color: #fff;
+}
+.location i {
+  width: 6px;
+  height: 6px;
+  background: #e9c267;
+  transform: rotate(45deg);
+}
+[hidden] {
+  display: none !important;
+}
+#hud {
+  position: fixed;
+  top: 13%;
+  left: 4%;
+  display: grid;
+  gap: 3px;
+}
+#hud b {
+  font: 34px Lucky;
+}
+#hud span,
+small {
+  color: #f2c36e;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+body.playing #shade {
+  background: linear-gradient(
+    0deg,
+    #0908188a,
+    transparent 16%,
+    transparent 90%,
+    #09081870
+  );
+}
+dialog {
+  background: #201b31;
+  color: #fff0da;
+  border: 1px solid #ae884e;
+  border-radius: 8px;
+  padding: 0;
+  max-width: min(430px, 92vw);
+  width: 430px;
+  box-shadow: 0 18px 70px #080717aa;
+}
+dialog::backdrop {
+  background: #080615af;
+  backdrop-filter: blur(5px);
+}
+.dialogBody {
+  padding: 28px;
+}
+h1 {
+  font: 38px Lucky;
+  margin: 12px 0 16px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #fff2;
+  padding: 9px 0;
+}
+.row span {
+  font-size: 14px;
+  color: #d3c9d0;
+}
+#dialogActions {
+  display: grid;
+  gap: 9px;
+  margin-top: 22px;
+}
+#dialogActions button {
+  font-size: 19px;
+}
+#prompt {
+  position: fixed;
+  bottom: 13%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  background: #201a31e6;
+  border: 1px solid #e5c078;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+#touch {
+  position: absolute;
+  bottom: 8%;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+#stick,
+.actions button {
+  pointer-events: auto;
+  touch-action: none;
+  border: 1px solid #fff6;
+  background: #17132e80;
+  color: white;
+  border-radius: 50%;
+}
+#stick {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+}
+#stick i {
+  width: 36px;
+  height: 36px;
+  background: #ffeecc55;
+  border-radius: 50%;
+}
+.actions button {
+  width: 55px;
+  height: 55px;
+  font: 15px Lucky;
+}
+.actions {
+  display: flex;
+  gap: 6px;
+}
+@media (max-aspect-ratio: 1/1) {
+  #menu {
+    left: 5%;
+    top: 58%;
+    width: 72vw;
+  }
+  header,
+  footer {
+    left: 5%;
+    right: 5%;
+  }
+  nav {
+    width: 79%;
+  }
+  .hints {
+    gap: 3px;
+  }
+  .location {
+    font-size: 9px;
+  }
+  .stamp {
+    font-size: 10px;
+  }
+}
+@media (max-height: 520px) {
+  #menu {
+    width: 38vw;
+  }
+  nav {
+    margin-top: 0;
+    gap: 4px;
+  }
+  .menuButton {
+    padding: 7px 5px 4px;
+  }
+}
+body:not(.playing) #shade,
+body:not(.playing) header,
+body:not(.playing) footer,
+#logo {
+  display: none;
+}
+body:not(.playing) #menu {
+  left: 50%;
+  top: 77%;
+  transform: translateX(-50%);
+  width: max-content;
+}
+nav {
+  display: grid;
+  gap: 0;
+  width: auto;
+  margin: 0;
+}
+.menuButton,
+.menuButton.selected {
+  font:
+    clamp(24px, 5.4vh, 48px) Lucky,
+    sans-serif;
+  color: #a77224;
+  letter-spacing: 0.045em;
+  border: 0;
+  box-shadow: none;
+  background: none;
+  transform: none;
+  line-height: 0.98;
+  padding: 2px 20px;
+  text-shadow:
+    2px 3px #431300,
+    -1px -1px #241000;
+}
+.menuButton.selected {
+  color: #ff8b0c;
+  text-shadow:
+    2px 3px #6d1804,
+    -1px -1px #4a1900;
+}
+.menuButton.selected:before {
+  display: none;
+}
+#play,
+#controls {
+  width: clamp(170px, 44vh, 400px);
+  height: 6.2vh;
+  max-height: 58px;
+  min-height: 25px;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  font-size: 0;
+  text-shadow: none;
+  image-rendering: pixelated;
+  filter: brightness(0.68) saturate(0.75);
+}
+#play {
+  background-image: url(/classic/new.png);
+}
+#controls {
+  background-image: url(/classic/load.png);
+}
+#play.selected,
+#controls.selected {
+  filter: brightness(1.15) saturate(1.23);
+}
+body:not(.playing) #menu {
+  top: 76%;
+}
+body.playing #hud,
+body.playing header .stamp,
+body.playing footer {
+  display: none;
+}
+body.playing header {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+body.playing header:hover,
+body.playing header:focus-within {
+  opacity: 1;
+}
+body.playing #shade {
+  background: none;
+}
+@media (pointer: coarse) {
+  body.playing header {
+    opacity: 0.85;
+  }
+}
+body:not(.ready) #menu {
+  visibility: hidden;
+}
+body:not(.ready):after {
+  content: "Loading Time Twister…";
+  position: fixed;
+  top: 48%;
+  width: 100%;
+  text-align: center;
+  font: 24px Lucky;
+  color: #ffc243;
+}
